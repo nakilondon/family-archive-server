@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29926.136
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "family-archive-server", "family-archive-server.csproj", "{6BACD164-0858-4B49-8C36-BA79B445BE62}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6BACD164-0858-4B49-8C36-BA79B445BE62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6BACD164-0858-4B49-8C36-BA79B445BE62}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6BACD164-0858-4B49-8C36-BA79B445BE62}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6BACD164-0858-4B49-8C36-BA79B445BE62}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EE710077-61D7-4172-A850-697283B172C3}
+	EndGlobalSection
+EndGlobal
