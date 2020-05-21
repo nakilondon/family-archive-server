@@ -19,6 +19,30 @@ namespace family_archive_server.Repositories
             _mapper = mapper;
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
+
+        public async Task UpdatePerson(PersonDb personDb)
+        {
+            var db = new MySqlConnection(_connectionString);
+            await db.ExecuteAsync(@"
+UPDATE People SET
+GedcomID = @GedcomID, 
+Gender = @Gender,
+PreferredName = @PreferredName, 
+GivenNames = @GivenNames,
+Surname = @Surname,
+BirthRangeStart = @BirthRangeStart,
+BirthRangeEnd = @BirthRangeEnd,  
+PlaceOfBirth = @PlaceOfBirth,
+Dead = @Dead,
+DeathRangeStart = @DeathRangeStart,
+DeathRangeEnd = @DeathRangeEnd,  
+PlaceOfDeath = @PlaceOfDeath,
+Note = @Note,
+Portrait = @Portrait
+WHERE Id = @Id", personDb);
+
+        }
+
         public async Task AddPerson(PersonDb personDb)
         {
 

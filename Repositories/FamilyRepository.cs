@@ -2,39 +2,24 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AutoMapper;
 using family_archive_server.Models;
+using family_archive_server.Utilities;
+//using Google.Protobuf.WellKnownTypes;
 
 namespace family_archive_server.Repositories
 {
     public class FamilyRepository : IFamilyRepository   
     {
         private readonly IPersonRepository _personRepository;
+        private readonly IMapper _mapper;
 
-        public FamilyRepository(IPersonRepository personRepository)
+        public FamilyRepository(IPersonRepository personRepository, IMapper mapper)
         {
             _personRepository = personRepository;
+            _mapper = mapper;
         }
-
-        public string FindDateFromRange(DateTime startDate, DateTime endDateTime)
-        {
-            if (startDate == default)
-            {
-                return null;
-            }
-
-            if (endDateTime == default)
-            {
-                return startDate.ToString("dd MMM yyyy");
-            }
-
-            if (endDateTime - startDate <= TimeSpan.FromDays(31))
-            {
-                return startDate.ToString("MMM yyyy");
-            }
-
-            return startDate.ToString("yyyy");
-        }
-
+        
         public string FindDates(PersonDb personDb)
         {
             string dates = null;
@@ -44,12 +29,12 @@ namespace family_archive_server.Repositories
                 dates += " (";
                 if (personDb.BirthRangeStart != default)
                 {
-                    dates += FindDateFromRange(personDb.BirthRangeStart, personDb.BirthRangeEnd);
+                    dates += Format.FindDateFromRange(personDb.BirthRangeStart, personDb.BirthRangeEnd);
                 }
 
                 if (personDb.DeathRangeStart != default)
                 {
-                    dates += " - " + FindDateFromRange(personDb.DeathRangeStart, personDb.DeathRangeEnd);
+                    dates += " - " + Format.FindDateFromRange(personDb.DeathRangeStart, personDb.DeathRangeEnd);
                 }
 
                 dates += ")";
@@ -67,7 +52,7 @@ namespace family_archive_server.Repositories
             {
                 var familyTreePerson = new FamilyTreePerson
                 {
-                    Id = personDb.Key,
+                    Id = personDb.Value.Id,
                     Title = personDb.Value.PreferredName,
                     Spouses = new List<int>(),
                     Parents = new List<int>(),
@@ -75,14 +60,16 @@ namespace family_archive_server.Repositories
                 };
 
                 familyTreePerson.Description = FindDates(personDb.Value);
+                
+                var gender = (Gender)Enum.Parse(typeof(Gender),personDb.Value.Gender);
 
-                if (personDb.Value.Gender == Gender.Female)
+                if (gender == Gender.Female)
                 {
                     familyTreePerson.ItemTitleColor = "#FDD7E4";
                     familyTreePerson.Image = "/img/Female.png";
                 }
 
-                if (personDb.Value.Gender == Gender.Male)
+                if (gender == Gender.Male)
                 {
                     familyTreePerson.Image = "/img/Male.png";
                 }
@@ -178,19 +165,23 @@ namespace family_archive_server.Repositories
                 });
             }
 
-            var personDetails = new PersonDetails
+            var personDetails = _mapper.Map<PersonDetails>(personDb);
+
+            if(string.IsNullOrEmpty(personDetails.Portrait))
             {
-                Id = personDb.Id,
-                PreferredName = personDb.PreferredName,
-                Family = familyDetails,
-                Birth = FindDateFromRange(personDb.BirthRangeStart, personDb.BirthRangeEnd),
-                Death = FindDateFromRange(personDb.DeathRangeStart, personDb.DeathRangeEnd),
-                FullName = personDb.GivenNames + " " + personDb.Surname,
-                Portrait = personDb.Portrait,
-                Note = personDb.Note,
-            };
+                var gender = (Gender)Enum.Parse(typeof(Gender), personDb.Gender);
+                personDetails.Portrait = gender == Gender.Male ? "Male.png" : "Female.png";
+            }
+            personDetails.Family = familyDetails;
 
             return personDetails;
+        }
+
+        public async Task UpdatePerson(PersonDetails personDetails)
+        {
+            var personDd = await _personRepository.FindPerson(personDetails.Id); 
+            _mapper.Map(personDetails, personDd);
+            await _personRepository.UpdatePerson(personDd);
         }
     }
 }

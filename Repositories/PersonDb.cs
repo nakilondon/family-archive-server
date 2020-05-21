@@ -35,7 +35,7 @@ namespace family_archive_server.Repositories
     {
         public int Id { get; set; }
         public string GedcomId { get; set; }
-        public Gender Gender { get; set; }
+        public string Gender { get; set; }
         public string PreferredName { get; set; }
         public string GivenNames { get; set; }
         public string Surname { get; set; }

@@ -69,7 +69,7 @@ namespace family_archive_server.Controllers
         [HttpGet("img/{fileName}")]
         public async Task<IActionResult> GetImg(string fileName)
         {
-            var imageData = await _imagesRepository.GetImage(fileName, ImageType.Original);
+            var imageData = await _imagesRepository.GetImage(fileName, ImageType.Web);
 
             return File(imageData.Image, imageData.Type);
         }
@@ -81,6 +81,13 @@ namespace family_archive_server.Controllers
 
             return File(imageData.Image, imageData.Type);
 
+        }
+
+        [HttpPut("update")]
+        public async  Task<PersonDetails> UpdatePerson([FromBody] PersonDetails personDetails)
+        {
+            await _familyRepository.UpdatePerson(personDetails);
+            return await _familyRepository.GetDetails(personDetails.Id);
         }
     }
 }

@@ -6,6 +6,7 @@ namespace family_archive_server.Repositories
     public interface IPersonRepository
     {
         Task AddPerson(PersonDb personDb);
+        Task UpdatePerson(PersonDb personDb);
         Task<PersonDb> FindPerson(int id);
         Task AddRelationship(RelationshipDb relationshipDb);
         Task<IDictionary<int, PersonDb>> FindAllPeople();
