@@ -181,6 +181,38 @@ INNER JOIN Relationship r ON p.Id = r.Person1",
             return lookup;
         }
 
-    
+        public async Task<IEnumerable<int>> FindRelationships(int personId, Relationship relationship)
+        {
+            var db = new MySqlConnection(_connectionString);
+            try
+            {
+
+                var result = await db.QueryAsync<int>(@"
+SELECT Person1
+FROM  Relationship 
+WHERE Person2 = @SearchPerson AND
+Relationship = @Relationship", new {SearchPerson = personId, Relationship = relationship.ToString()});
+                return result;
+            }
+            catch (Exception e)
+            {
+                throw e;
+            }
+        }
+
+        public async Task RemoveRelationships(int personId)
+        {
+            var db = new MySqlConnection(_connectionString);
+            try
+            {
+
+                await db.ExecuteAsync("DELETE FROM  Relationship WHERE Person1 = @id OR Person2 = @id", new{id = personId});
+                
+            }
+            catch (Exception e)
+            {
+                throw e;
+            }
+        }
     }
 }

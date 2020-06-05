@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using AutoMapper;
 using family_archive_server.Models;
 using family_archive_server.Utilities;
-//using Google.Protobuf.WellKnownTypes;
 
 namespace family_archive_server.Repositories
 {
@@ -130,6 +129,15 @@ namespace family_archive_server.Repositories
             return familyTreePeople;
         }
 
+        private ListPerson CreateListPerson(PersonDb personDb)
+        {
+            return new ListPerson
+            {
+                Id = personDb.Id,
+                Label = personDb.PreferredName + " " + FindDates(personDb)
+            };
+        }
+
         public async Task<IEnumerable<ListPerson>> GetList()
         {
             var peopleDb = await _personRepository.FindAllPeople();
@@ -137,13 +145,7 @@ namespace family_archive_server.Repositories
 
             foreach (var personDb in peopleDb)
             {
-                var person = new ListPerson
-                {
-                    Id = personDb.Key,
-                    Label = personDb.Value.PreferredName + " " + FindDates(personDb.Value)
-                };
-                
-                listPeople.Add(person);
+                listPeople.Add(CreateListPerson(personDb.Value));
             }
 
             return listPeople;
@@ -153,15 +155,19 @@ namespace family_archive_server.Repositories
         {
             var personDb = await _personRepository.FindPerson(id);
 
+            var family = await PersonUtils.FindSiblings(personDb, _personRepository);
+            family.AddRange(personDb.Relationships);
             var familyDetails = new List<Family>();
-            foreach (var relationship in personDb.Relationships)
+
+            foreach (var familyMember in family.OrderBy(f => f.Relationship))
             {
-                var familyPerson = await _personRepository.FindPerson(relationship.PersonId);
-                familyDetails.Add(new Family
+                var familyMemberDetails = await _personRepository.FindPerson(familyMember.PersonId);
+                
+                familyDetails.Add( new Family
                 {
-                    Id = relationship.PersonId,
-                    Name = familyPerson.PreferredName,
-                    Relationship = relationship.Relationship.ToString()
+                    Id = familyMember.PersonId,
+                    Name = familyMemberDetails.PreferredName,
+                    Relationship = familyMember.Relationship.ToString()
                 });
             }
 
@@ -172,15 +178,132 @@ namespace family_archive_server.Repositories
                 var gender = (Gender)Enum.Parse(typeof(Gender), personDb.Gender);
                 personDetails.Portrait = gender == Gender.Male ? "Male.png" : "Female.png";
             }
+
             personDetails.Family = familyDetails;
 
             return personDetails;
         }
 
-        public async Task UpdatePerson(PersonDetails personDetails)
+        public async Task<PersonDetailsUpdate> GetDetailsForUpdate(int id)
+        {
+            var personDb = await _personRepository.FindPerson(id);
+
+            var familyDetails = new List<FamilyUpdateInternal>();
+            foreach (var relationship in personDb.Relationships)
+            {
+                var familyPerson = await _personRepository.FindPerson(relationship.PersonId);
+                familyDetails.Add(new FamilyUpdateInternal
+                {
+                    Id = relationship.PersonId,
+                    Label = familyPerson.PreferredName + " " + FindDates(familyPerson),
+                    Relationship = relationship.Relationship
+                });
+            }
+
+            var personDetails = _mapper.Map<PersonDetailsUpdate>(personDb);
+
+            personDetails.Spouses = familyDetails
+                .Where(r => r.Relationship == Relationship.Wife || r.Relationship == Relationship.Husband ||
+                            r.Relationship == Relationship.Spouse)
+                .Select(r => new ListPerson{Id = r.Id, Label = r.Label})
+                .ToList();
+
+            personDetails.Parents = familyDetails
+                .Where(r => r.Relationship == Relationship.Mother || r.Relationship == Relationship.Father ||
+                            r.Relationship == Relationship.Parent)
+                .Select(r => new ListPerson { Id = r.Id, Label = r.Label })
+                .ToList();
+
+            personDetails.Children = familyDetails
+                .Where(r => r.Relationship == Relationship.Daughter || r.Relationship == Relationship.Son ||
+                            r.Relationship == Relationship.Child)
+                .Select(r => new ListPerson { Id = r.Id, Label = r.Label })
+                .ToList();
+
+            if (string.IsNullOrEmpty(personDetails.Portrait))
+            {
+                var gender = (Gender)Enum.Parse(typeof(Gender), personDb.Gender);
+                personDetails.Portrait = gender == Gender.Male ? "Male.png" : "Female.png";
+            }
+
+            return personDetails;
+        }
+
+        private async Task CreateRelationships(PersonDetailsUpdate personDetails)
+        {
+            await _personRepository.RemoveRelationships(personDetails.Id);
+            
+            foreach (var parent in personDetails.Parents)
+            {
+                var parentDetails = await _personRepository.FindPerson(parent.Id);
+                await _personRepository.AddRelationship(new RelationshipDb
+                {
+                    Person1 = personDetails.Id,
+                    RelationShip = parentDetails.Gender == Gender.Female.ToString()
+                        ? Relationship.Mother.ToString()
+                        : Relationship.Father.ToString(),
+                    Person2 = parent.Id
+                });
+                await _personRepository.AddRelationship(new RelationshipDb()
+                {
+                    Person1 = parent.Id,
+                    RelationShip = personDetails.Gender == Gender.Female.ToString()
+                        ? Relationship.Daughter.ToString()
+                        : Relationship.Son.ToString(),
+                    Person2 = personDetails.Id
+                });
+            }
+
+            foreach (var spouse in personDetails.Spouses)
+            {
+                var spouseDetails = await _personRepository.FindPerson(spouse.Id);
+                await _personRepository.AddRelationship(new RelationshipDb
+                {
+                    Person1 = personDetails.Id,
+                    RelationShip = spouseDetails.Gender == Gender.Female.ToString()
+                        ? Relationship.Wife.ToString()
+                        : Relationship.Husband.ToString(),
+                    Person2 = spouse.Id
+                });
+                await _personRepository.AddRelationship(new RelationshipDb()
+                {
+                    Person1 = spouse.Id,
+                    RelationShip = personDetails.Gender == Gender.Female.ToString()
+                        ? Relationship.Wife.ToString()
+                        : Relationship.Husband.ToString(),
+                    Person2 = personDetails.Id
+                });
+            }
+
+            foreach (var child in personDetails.Children) 
+            {
+                var childDetails = await _personRepository.FindPerson(child.Id);
+
+                await _personRepository.AddRelationship(new RelationshipDb()
+                {
+                    Person1 = personDetails.Id,
+                    RelationShip = childDetails.Gender == Gender.Female.ToString()
+                        ? Relationship.Daughter.ToString()
+                        : Relationship.Son.ToString(),
+                    Person2 = child.Id
+                });
+
+                await _personRepository.AddRelationship(new RelationshipDb
+                {
+                    Person1 = child.Id,
+                    RelationShip = personDetails.Gender == Gender.Female.ToString()
+                        ? Relationship.Mother.ToString()
+                        : Relationship.Father.ToString(),
+                    Person2 = personDetails.Id
+                });
+            }
+        }
+
+        public async Task UpdatePerson(PersonDetailsUpdate personDetails)
         {
             var personDd = await _personRepository.FindPerson(personDetails.Id); 
             _mapper.Map(personDetails, personDd);
+            await CreateRelationships(personDetails);
             await _personRepository.UpdatePerson(personDd);
         }
     }

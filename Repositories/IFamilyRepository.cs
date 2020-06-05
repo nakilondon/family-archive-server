@@ -9,6 +9,7 @@ namespace family_archive_server.Repositories
         Task<IEnumerable<FamilyTreePerson>> GetFamilyTree();
         Task<IEnumerable<ListPerson>> GetList();
         Task<PersonDetails> GetDetails(int id);
-        Task UpdatePerson(PersonDetails personDetails);
+        Task<PersonDetailsUpdate> GetDetailsForUpdate(int id);
+        Task UpdatePerson(PersonDetailsUpdate personDetails);
     }
 }

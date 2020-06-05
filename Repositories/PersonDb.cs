@@ -13,16 +13,16 @@ namespace family_archive_server.Repositories
     {
         Mother = 0,
         Father = 1,
-        Wife = 2,
+        Parent = 2,
+        Wife = 3,
         Husband = 4,
-        Son = 5,
-        Daughter = 6,
-        Spouse = 7,
+        Spouse = 5,
+        Son = 6,
+        Daughter = 7,
         Child = 8,
-        Parent = 9,
-        Sister = 10,
-        Brother = 11,
-        Sibling = 12
+        Sister = 9,
+        Brother = 10,
+        Sibling = 11
     }
 
     public class RelationshipTable

@@ -10,5 +10,7 @@ namespace family_archive_server.Repositories
         Task<PersonDb> FindPerson(int id);
         Task AddRelationship(RelationshipDb relationshipDb);
         Task<IDictionary<int, PersonDb>> FindAllPeople();
+        Task<IEnumerable<int>> FindRelationships(int personId, Relationship relationship);
+        Task RemoveRelationships(int personId);
     }
 }

@@ -84,10 +84,18 @@ namespace family_archive_server.Controllers
         }
 
         [HttpPut("update")]
-        public async  Task<PersonDetails> UpdatePerson([FromBody] PersonDetails personDetails)
+        public async  Task<PersonDetails> UpdatePerson([FromBody] PersonDetailsUpdate personDetails)
         {
             await _familyRepository.UpdatePerson(personDetails);
             return await _familyRepository.GetDetails(personDetails.Id);
+        }
+
+        [HttpGet("update/{id}")]
+        public async Task<PersonDetailsUpdate> GetUpdate(int id)
+        {
+            var returnValues = await _familyRepository.GetDetailsForUpdate(id);
+
+            return returnValues;
         }
     }
 }
