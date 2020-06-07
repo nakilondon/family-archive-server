@@ -11,5 +11,7 @@ namespace family_archive_server.Repositories
         Task<PersonDetails> GetDetails(int id);
         Task<PersonDetailsUpdate> GetDetailsForUpdate(int id);
         Task UpdatePerson(PersonDetailsUpdate personDetails);
+        Task<int> AddPerson(PersonDetailsUpdate personDetails);
+        Task DeletePerson(int id);
     }
 }

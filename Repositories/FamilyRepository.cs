@@ -231,8 +231,11 @@ namespace family_archive_server.Repositories
 
         private async Task CreateRelationships(PersonDetailsUpdate personDetails)
         {
-            await _personRepository.RemoveRelationships(personDetails.Id);
-            
+            if (personDetails.Id != 0)
+            {
+                await _personRepository.RemoveRelationships(personDetails.Id);
+            }
+
             foreach (var parent in personDetails.Parents)
             {
                 var parentDetails = await _personRepository.FindPerson(parent.Id);
@@ -305,6 +308,21 @@ namespace family_archive_server.Repositories
             _mapper.Map(personDetails, personDd);
             await CreateRelationships(personDetails);
             await _personRepository.UpdatePerson(personDd);
+        }
+
+        public async Task<int> AddPerson(PersonDetailsUpdate personDetails)
+        {
+            var personDb = _mapper.Map<PersonDb>(personDetails);
+            var personId = await _personRepository.AddPerson(personDb);
+            personDetails.Id = personId;
+            await CreateRelationships(personDetails);
+            return personId;
+        }
+
+        public async Task DeletePerson(int id)
+        {
+            await _personRepository.RemoveRelationships(id);
+            await _personRepository.DeletePerson(id);
         }
     }
 }

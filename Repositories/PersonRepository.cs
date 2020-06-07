@@ -43,7 +43,7 @@ WHERE Id = @Id", personDb);
 
         }
 
-        public async Task AddPerson(PersonDb personDb)
+        public async Task<int> AddPerson(PersonDb personDb)
         {
 
             if (personDb.NickName == null)
@@ -61,13 +61,22 @@ WHERE Id = @Id", personDb);
             if (personDb.Portrait == null)
                 personDb.Portrait = "";
 
+            if (personDb.GedcomId == null)
+                personDb.GedcomId = "";
 
             var db = new MySqlConnection(_connectionString);
+
+            var personId = 0;
             try
             {
+                personId = await db.QuerySingleAsync<int>("SELECT Auto_increment FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'People'");
+                personDb.Id = personId;
+                personDb.GedcomId = personId.ToString();
+
                 await db.ExecuteAsync(@"
 INSERT INTO People (
-GedcomID, 
+Id,
+GedcomId, 
 Gender,
 PreferredName, 
 GivenNames,
@@ -80,7 +89,8 @@ DeathRangeStart,
 DeathRangeEnd, 
 PlaceOfDeath
 ) VALUES (
-@GedcomID, 
+@Id,
+@GedcomId, 
 @Gender,
 @PreferredName, 
 @GivenNames,
@@ -94,6 +104,7 @@ PlaceOfDeath
 @PlaceOfDeath)", personDb);
             } catch (Exception e)
             {}
+            return personId;
         }
 
         public async Task<PersonDb> FindPerson(int id)
@@ -208,6 +219,19 @@ Relationship = @Relationship", new {SearchPerson = personId, Relationship = rela
 
                 await db.ExecuteAsync("DELETE FROM  Relationship WHERE Person1 = @id OR Person2 = @id", new{id = personId});
                 
+            }
+            catch (Exception e)
+            {
+                throw e;
+            }
+        }
+
+        public async Task DeletePerson(int personId)
+        {
+            var db = new MySqlConnection(_connectionString);
+            try
+            {
+                await db.ExecuteAsync("DELETE FROM People WHERE Id = @id", new { id = personId });
             }
             catch (Exception e)
             {

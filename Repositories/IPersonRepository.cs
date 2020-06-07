@@ -5,12 +5,13 @@ namespace family_archive_server.Repositories
 {
     public interface IPersonRepository
     {
-        Task AddPerson(PersonDb personDb);
+        Task<int> AddPerson(PersonDb personDb);
         Task UpdatePerson(PersonDb personDb);
         Task<PersonDb> FindPerson(int id);
         Task AddRelationship(RelationshipDb relationshipDb);
         Task<IDictionary<int, PersonDb>> FindAllPeople();
         Task<IEnumerable<int>> FindRelationships(int personId, Relationship relationship);
         Task RemoveRelationships(int personId);
+        Task DeletePerson(int personId);
     }
 }
