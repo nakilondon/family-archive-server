@@ -1,12 +1,16 @@
 ﻿using System.Collections.Generic;
 using family_archive_server.Repositories;
+using Newtonsoft.Json;
 
 namespace family_archive_server.Models
 {
     public class UpdateDate
     {
+        [JsonProperty("day")]
         public int Day { get; set; }
+        [JsonProperty("month")]
         public int Month { get; set; }
+        [JsonProperty("year")]
         public int Year { get; set; }
     }
 

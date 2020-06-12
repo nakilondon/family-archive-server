@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using family_archive_server.Models;
 using family_archive_server.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 
 namespace family_archive_server.Controllers
 {
@@ -43,19 +44,27 @@ namespace family_archive_server.Controllers
         }
 
         [HttpPost("Upload")]
-        public async Task<IActionResult> Post([FromForm] FIleUpload fileUpload)
+        public async Task<IActionResult> Post([FromForm] RawFIleUpload rawFileUpload)
         {
             byte[] fileBytes;
+            var fileUpload = JsonConvert.DeserializeObject<FIleUpload>(rawFileUpload.Details);
+            //var date = JsonConvert.DeserializeObject<UpdateDate>(fileUpload.Date);
+
             using (var memoryStream = new MemoryStream())
             {
-                await fileUpload.File.CopyToAsync(memoryStream);
+                await rawFileUpload.File.CopyToAsync(memoryStream);
                 fileBytes = memoryStream.ToArray();
+            }
+
+            if (await _imagesRepository.GetImage(fileUpload.Name, ImageType.Thumbnail) != null)
+            {
+                return BadRequest($"{rawFileUpload.File.FileName} already exists");
             }
 
             var imageData = new ImageData
             {
-                FileName = fileUpload.File.FileName,
-                Type = fileUpload.File.ContentType,
+                FileName = fileUpload.Name,
+                Type = rawFileUpload.File.ContentType,
                 Description = fileUpload.Description,
                 Location = "",
                 Image = fileBytes

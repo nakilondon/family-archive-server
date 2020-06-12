@@ -85,6 +85,10 @@ namespace family_archive_server.Repositories
             ScaleImage(imageData.Image, imageData.FileName, GetSection(ImageType.Thumbnail));
 
             var db = new MySqlConnection(_connectionString);
+
+            imageDb.Description ??= " ";
+            imageDb.Location ??= " ";
+
             await db.ExecuteAsync("INSERT INTO Images(FileName, Type, Location, Description) VALUES (@FileName, @Type, @Location, @Description)", imageDb);
 
         }
@@ -93,7 +97,12 @@ namespace family_archive_server.Repositories
         {
             var db = new MySqlConnection(_connectionString);
             var imageDb = await db.QueryFirstOrDefaultAsync<ImageData>("SELECT * FROM Images WHERE FileName = @FileName;", new { FileName = fileName });
-            
+
+            if (imageDb == null)
+            {
+                return null;
+            }
+
             var imageData = _mapper.Map<ImageData>(imageDb);
 
             string filename = Path.Combine(GetSection(imageType).GetValue<string>("Path"), imageData.FileName);
