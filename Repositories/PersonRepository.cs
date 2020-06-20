@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using AutoMapper;
 using Dapper;
+using family_archive_server.Models;
 using Microsoft.Extensions.Configuration;
 using MySql.Data.MySqlClient;
 
@@ -110,15 +111,17 @@ PlaceOfDeath
         public async Task<PersonDb> FindPerson(int id)
         {
             var lookup = new Dictionary<int, PersonDb>();
+            
 
             var db = new MySqlConnection(_connectionString);
             try
             {
  
-               var result = await db.QueryAsync<PersonTableDb, RelationshipDb, PersonDb>(@"
+               var result = await db.QueryAsync<PersonTableDb, RelationshipDb, PersonDb> (@"
 SELECT p.*, r.*
 FROM People p
-INNER JOIN Relationship r ON p.Id = r.Person1 WHERE p.Id = @Id",
+INNER JOIN Relationship r ON p.Id = r.Person1
+WHERE p.Id = @Id",
                    (p, r) =>
                    {
                        PersonDb personDb;

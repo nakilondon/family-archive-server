@@ -21,7 +21,7 @@ namespace family_archive_server.Models
         public Relationship Relationship { get; set; }
     }
 
-    public class FamilyUpdate
+    public class PeopleList
     {
         public int Id { get; set; }
         public string Label { get; set; }

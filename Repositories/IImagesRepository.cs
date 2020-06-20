@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 using family_archive_server.Models;
 
 namespace family_archive_server.Repositories
@@ -7,5 +8,8 @@ namespace family_archive_server.Repositories
     {
         Task SaveImage(ImageData imageData);
         Task<ImageData> GetImage(string fileName, ImageType imageType);
+
+        Task<List<ImageDb>> GetImagesForPerson(int personId);
+        Task<List<int>> GetPeopleInImage(int imageId);
     }
 }

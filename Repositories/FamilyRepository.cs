@@ -12,11 +12,13 @@ namespace family_archive_server.Repositories
     {
         private readonly IPersonRepository _personRepository;
         private readonly IMapper _mapper;
+        private readonly IImagesRepository _imagesRepository;
 
-        public FamilyRepository(IPersonRepository personRepository, IMapper mapper)
+        public FamilyRepository(IPersonRepository personRepository, IMapper mapper, IImagesRepository imagesRepository)
         {
             _personRepository = personRepository;
             _mapper = mapper;
+            _imagesRepository = imagesRepository;
         }
         
         public string FindDates(PersonDb personDb)
@@ -180,6 +182,33 @@ namespace family_archive_server.Repositories
             }
 
             personDetails.Family = familyDetails;
+            var images = await _imagesRepository.GetImagesForPerson(id);
+            personDetails.Images = new List<ImageDetails>();
+
+            foreach (var image in images)
+            {
+                var peopleInImage = await _imagesRepository.GetPeopleInImage(image.Id);
+                
+                string caption = peopleInImage.Count > 0 ? "People: \n" : "";
+                
+                foreach (var personInImage in peopleInImage)
+                {
+                    var personDbImage = await _personRepository.FindPerson(personInImage);
+                    caption += $"\t{personDbImage.PreferredName}\n";
+                }
+
+                if (!string.IsNullOrEmpty(image?.Description))
+                {
+                    caption += $"Description: {image.Description}\n";
+                }
+
+                if (!string.IsNullOrEmpty(image?.Location))
+                {
+                    caption += $"Location: {image.Location}\n";
+                }
+
+                personDetails.Images.Add(new ImageDetails { FileName = image.FileName, Caption = caption });
+            }
 
             return personDetails;
         }

@@ -50,6 +50,7 @@ namespace family_archive_server.Repositories
         public string Note { get; set; }
         public string Portrait { get; set; }
         public IList<RelationshipTable> Relationships { get; set; }
+        public IList<string> Images { get; set; } 
     }
 
     public class PersonTableDb

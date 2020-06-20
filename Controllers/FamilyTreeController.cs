@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using family_archive_server.Models;
 using family_archive_server.Repositories;
@@ -66,9 +67,12 @@ namespace family_archive_server.Controllers
                 FileName = fileUpload.Name,
                 Type = rawFileUpload.File.ContentType,
                 Description = fileUpload.Description,
-                Location = "",
+                Location = fileUpload.Location,
                 Image = fileBytes
+               // People = new List<int>()
             };
+
+            imageData.People = fileUpload.People.Select(p => p.Id).ToList();
 
             await _imagesRepository.SaveImage(imageData);
 
@@ -79,6 +83,14 @@ namespace family_archive_server.Controllers
         public async Task<IActionResult> GetImg(string fileName)
         {
             var imageData = await _imagesRepository.GetImage(fileName, ImageType.Web);
+
+            return File(imageData.Image, imageData.Type);
+        }
+
+        [HttpGet("original/{fileName}")]
+        public async Task<IActionResult> GetOriginal(string fileName)
+        {
+            var imageData = await _imagesRepository.GetImage(fileName, ImageType.Original);
 
             return File(imageData.Image, imageData.Type);
         }

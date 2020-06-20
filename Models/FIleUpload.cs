@@ -15,6 +15,6 @@ namespace family_archive_server.Models
         public string Location { get; set; }
         public UpdateDate Date { get; set; }
         public string Description { get; set; }
-        public IEnumerable<int> People { get; set; }
+        public IList<PeopleList> People { get; set; }
     }
 }

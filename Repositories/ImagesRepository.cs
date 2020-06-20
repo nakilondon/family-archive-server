@@ -1,4 +1,7 @@
-﻿using System.IO;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
 using Dapper;
@@ -88,8 +91,15 @@ namespace family_archive_server.Repositories
 
             imageDb.Description ??= " ";
             imageDb.Location ??= " ";
+            imageDb.Id = await db.QuerySingleAsync<int>("SELECT Auto_increment FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Images'");
 
-            await db.ExecuteAsync("INSERT INTO Images(FileName, Type, Location, Description) VALUES (@FileName, @Type, @Location, @Description)", imageDb);
+            await db.ExecuteAsync("INSERT INTO Images(Id, FileName, Type, Location, Description) VALUES (@Id, @FileName, @Type, @Location, @Description)", imageDb);
+
+            foreach (var personId in imageData.People)
+            {
+                var peopleInImageDb = new PeopleInImageDb { ImageId = imageDb.Id, PersonId = personId };
+                await db.ExecuteAsync("INSERT INTO PeopleInImage(ImageId, PersonId) VALUES (@ImageId, @PersonId)", peopleInImageDb);
+            }
 
         }
         
@@ -109,6 +119,53 @@ namespace family_archive_server.Repositories
             imageData.Image = await File.ReadAllBytesAsync(filename);
 
             return imageData;
+        }
+
+        public async Task<List<ImageDb>> GetImagesForPerson(int personId)
+        {
+                var lookup = new Dictionary<int, ImageDb>();
+
+
+                var db = new MySqlConnection(_connectionString);
+                try
+                {
+
+                    var result = await db.QueryAsync<PeopleInImageDb, ImageDb, string>(@"
+SELECT pI.*, i.*
+FROM PeopleInImage pI
+INNER JOIN Images i ON pI.ImageId = i.Id
+WHERE pI.PersonId = @Id",
+                        (pI, i) =>
+                        {
+                            ImageDb imageDb;
+                            if (!lookup.TryGetValue(i.Id, out imageDb))
+                            {
+                                lookup.Add(i.Id, i);
+                            }
+
+                            return i.FileName;
+                        }, splitOn: "Id",
+                        param: new { @Id = personId });
+                }
+                catch (Exception e)
+                { }
+
+                return lookup.Values.ToList();
+
+            
+        }
+
+        public async Task<List<int>> GetPeopleInImage(int imageId)
+        {
+            var db = new MySqlConnection(_connectionString);
+            var peopleInImage = await db.QueryAsync<int>("SELECT PersonId FROM PeopleInImage WHERE ImageId = @ImageId;", new { ImageId = imageId });
+
+            if (peopleInImage == null)
+            {
+                return null;
+            }
+
+            return peopleInImage.ToList();
         }
     }
 }
