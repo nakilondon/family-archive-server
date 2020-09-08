@@ -30,6 +30,7 @@ namespace family_archive_server.Models
     public class PersonDetailsUpdate
     {
         public int Id { get; set; }
+        public string Token { get; set; }
         public string Gender { get; set; }
         public string PreferredName { get; set; }
         public string GivenNames { get; set; }

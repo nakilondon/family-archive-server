@@ -44,13 +44,18 @@ namespace family_archive_server.Repositories
             return dates;
         }
 
-        public async Task<IEnumerable<FamilyTreePerson>> GetFamilyTree()
+        public async Task<IEnumerable<FamilyTreePerson>> GetFamilyTree(Roles roles)
         {
             var peopleDb= await _personRepository.FindAllPeople();
             var familyTreePeople = new List<FamilyTreePerson>();
 
             foreach (var personDb in peopleDb)
             {
+                if (roles == Roles.General && !personDb.Value.Dead)
+                {
+                    continue;
+                }
+
                 var familyTreePerson = new FamilyTreePerson
                 {
                     Id = personDb.Value.Id,
@@ -87,7 +92,10 @@ namespace family_archive_server.Repositories
 
                 foreach (var spouse in spouses)
                 {
-                    familyTreePerson.Spouses.Add(spouse.PersonId);
+                    if (roles != Roles.General || peopleDb[spouse.PersonId].Dead)
+                    {
+                        familyTreePerson.Spouses.Add(spouse.PersonId);
+                    }
                 }
 
                 var parents = personDb.Value.Relationships.Where(r =>
@@ -96,7 +104,10 @@ namespace family_archive_server.Repositories
 
                 foreach (var parent in parents)
                 {
-                    familyTreePerson.Parents.Add(parent.PersonId);
+                    if (roles != Roles.General || peopleDb[parent.PersonId].Dead)
+                    {
+                        familyTreePerson.Parents.Add(parent.PersonId);
+                    }
                 }
                 
                 familyTreePeople.Add(familyTreePerson);
@@ -140,20 +151,23 @@ namespace family_archive_server.Repositories
             };
         }
 
-        public async Task<IEnumerable<ListPerson>> GetList()
+        public async Task<IEnumerable<ListPerson>> GetList(Roles roles)
         {
             var peopleDb = await _personRepository.FindAllPeople();
             var listPeople = new List<ListPerson>();
 
             foreach (var personDb in peopleDb)
             {
-                listPeople.Add(CreateListPerson(personDb.Value));
+                if (roles != Roles.General || personDb.Value.Dead)
+                {
+                    listPeople.Add(CreateListPerson(personDb.Value));
+                }
             }
 
             return listPeople;
         }
 
-        public async Task<PersonDetails> GetDetails(int id)
+        public async Task<PersonDetails> GetDetails(Roles roles, int id)
         {
             var personDb = await _personRepository.FindPerson(id);
 
@@ -164,13 +178,16 @@ namespace family_archive_server.Repositories
             foreach (var familyMember in family.OrderBy(f => f.Relationship))
             {
                 var familyMemberDetails = await _personRepository.FindPerson(familyMember.PersonId);
-                
-                familyDetails.Add( new Family
+
+                if (roles != Roles.General || familyMemberDetails.Dead)
                 {
-                    Id = familyMember.PersonId,
-                    Name = familyMemberDetails.PreferredName,
-                    Relationship = familyMember.Relationship.ToString()
-                });
+                    familyDetails.Add(new Family
+                    {
+                        Id = familyMember.PersonId,
+                        Name = familyMemberDetails.PreferredName,
+                        Relationship = familyMember.Relationship.ToString()
+                    });
+                }
             }
 
             var personDetails = _mapper.Map<PersonDetails>(personDb);
