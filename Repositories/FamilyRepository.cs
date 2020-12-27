@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
 using family_archive_server.Models;
+using family_archive_server.RepositoriesDb;
 using family_archive_server.Utilities;
 
 namespace family_archive_server.Repositories
@@ -12,43 +13,28 @@ namespace family_archive_server.Repositories
     {
         private readonly IPersonRepository _personRepository;
         private readonly IMapper _mapper;
+        private readonly IImagesRepository _imagesRepository;
 
-        public FamilyRepository(IPersonRepository personRepository, IMapper mapper)
+        public FamilyRepository(IPersonRepository personRepository, IMapper mapper, IImagesRepository imagesRepository)
         {
             _personRepository = personRepository;
             _mapper = mapper;
+            _imagesRepository = imagesRepository;
         }
         
-        public string FindDates(PersonDb personDb)
-        {
-            string dates = null;
 
-            if (personDb.BirthRangeStart != default || personDb.DeathRangeStart != default)
-            {
-                dates += " (";
-                if (personDb.BirthRangeStart != default)
-                {
-                    dates += Format.FindDateFromRange(personDb.BirthRangeStart, personDb.BirthRangeEnd);
-                }
-
-                if (personDb.DeathRangeStart != default)
-                {
-                    dates += " - " + Format.FindDateFromRange(personDb.DeathRangeStart, personDb.DeathRangeEnd);
-                }
-
-                dates += ")";
-            }
-
-            return dates;
-        }
-
-        public async Task<IEnumerable<FamilyTreePerson>> GetFamilyTree()
+        public async Task<IEnumerable<FamilyTreePerson>> GetFamilyTree(Roles roles)
         {
             var peopleDb= await _personRepository.FindAllPeople();
             var familyTreePeople = new List<FamilyTreePerson>();
 
             foreach (var personDb in peopleDb)
             {
+                if (roles == Roles.General && !personDb.Value.Dead)
+                {
+                    continue;
+                }
+
                 var familyTreePerson = new FamilyTreePerson
                 {
                     Id = personDb.Value.Id,
@@ -58,7 +44,7 @@ namespace family_archive_server.Repositories
                     BirthDate = personDb.Value.BirthRangeStart
                 };
 
-                familyTreePerson.Description = FindDates(personDb.Value);
+                familyTreePerson.Description = PersonUtils.FindDates(personDb.Value);
                 
                 var gender = (Gender)Enum.Parse(typeof(Gender),personDb.Value.Gender);
 
@@ -76,7 +62,7 @@ namespace family_archive_server.Repositories
                 
                 if (!string.IsNullOrWhiteSpace(personDb.Value?.Portrait))
                 {
-                    familyTreePerson.Image = $"familytree/thumbnail/{personDb.Value.Portrait}";
+                    familyTreePerson.Image = $"picture/thumbnail/{personDb.Value.Portrait}";
                 }
 
                 var spouses = personDb.Value.Relationships.Where(r =>
@@ -85,7 +71,10 @@ namespace family_archive_server.Repositories
 
                 foreach (var spouse in spouses)
                 {
-                    familyTreePerson.Spouses.Add(spouse.PersonId);
+                    if (roles != Roles.General || peopleDb[spouse.PersonId].Dead)
+                    {
+                        familyTreePerson.Spouses.Add(spouse.PersonId);
+                    }
                 }
 
                 var parents = personDb.Value.Relationships.Where(r =>
@@ -94,7 +83,10 @@ namespace family_archive_server.Repositories
 
                 foreach (var parent in parents)
                 {
-                    familyTreePerson.Parents.Add(parent.PersonId);
+                    if (roles != Roles.General || peopleDb[parent.PersonId].Dead)
+                    {
+                        familyTreePerson.Parents.Add(parent.PersonId);
+                    }
                 }
                 
                 familyTreePeople.Add(familyTreePerson);
@@ -129,29 +121,23 @@ namespace family_archive_server.Repositories
             return familyTreePeople;
         }
 
-        private ListPerson CreateListPerson(PersonDb personDb)
-        {
-            return new ListPerson
-            {
-                Id = personDb.Id,
-                Label = personDb.PreferredName + " " + FindDates(personDb)
-            };
-        }
-
-        public async Task<IEnumerable<ListPerson>> GetList()
+        public async Task<IEnumerable<ListPerson>> GetList(Roles roles)
         {
             var peopleDb = await _personRepository.FindAllPeople();
             var listPeople = new List<ListPerson>();
 
             foreach (var personDb in peopleDb)
             {
-                listPeople.Add(CreateListPerson(personDb.Value));
+                if (roles != Roles.General || personDb.Value.Dead)
+                {
+                    listPeople.Add(PersonUtils.CreateListPerson(personDb.Value));
+                }
             }
 
             return listPeople;
         }
 
-        public async Task<PersonDetails> GetDetails(int id)
+        public async Task<PersonDetails> GetDetails(Roles roles, int id)
         {
             var personDb = await _personRepository.FindPerson(id);
 
@@ -162,13 +148,16 @@ namespace family_archive_server.Repositories
             foreach (var familyMember in family.OrderBy(f => f.Relationship))
             {
                 var familyMemberDetails = await _personRepository.FindPerson(familyMember.PersonId);
-                
-                familyDetails.Add( new Family
+
+                if (roles != Roles.General || familyMemberDetails.Dead)
                 {
-                    Id = familyMember.PersonId,
-                    Name = familyMemberDetails.PreferredName,
-                    Relationship = familyMember.Relationship.ToString()
-                });
+                    familyDetails.Add(new Family
+                    {
+                        Id = familyMember.PersonId,
+                        Name = familyMemberDetails.PreferredName,
+                        Relationship = familyMember.Relationship.ToString()
+                    });
+                }
             }
 
             var personDetails = _mapper.Map<PersonDetails>(personDb);
@@ -180,6 +169,33 @@ namespace family_archive_server.Repositories
             }
 
             personDetails.Family = familyDetails;
+            var images = await _imagesRepository.GetImagesForPerson(id);
+            personDetails.Images = new List<ImageDetails>();
+
+            foreach (var image in images)
+            {
+                var peopleInImage = await _imagesRepository.GetPeopleInImage(image.Id);
+                
+                string caption = peopleInImage.Count > 0 ? "People: \n" : "";
+                
+                foreach (var personInImage in peopleInImage)
+                {
+                    var personDbImage = await _personRepository.FindPerson(personInImage);
+                    caption += $"\t{personDbImage.PreferredName}\n";
+                }
+
+                if (!string.IsNullOrEmpty(image.Description))
+                {
+                    caption += $"Description: {image.Description}\n";
+                }
+
+                if (!string.IsNullOrEmpty(image.Location))
+                {
+                    caption += $"Location: {image.Location}\n";
+                }
+
+                personDetails.Images.Add(new ImageDetails { Id = image.Id, FileName = image.FileName, Orientation = image.Orientation, Caption = caption });
+            }
 
             return personDetails;
         }
@@ -195,7 +211,7 @@ namespace family_archive_server.Repositories
                 familyDetails.Add(new FamilyUpdateInternal
                 {
                     Id = relationship.PersonId,
-                    Label = familyPerson.PreferredName + " " + FindDates(familyPerson),
+                    Label = familyPerson.PreferredName + " " + PersonUtils.FindDates(familyPerson),
                     Relationship = relationship.Relationship
                 });
             }

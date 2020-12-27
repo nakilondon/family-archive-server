@@ -1,12 +1,44 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using family_archive_server.Repositories;
+using family_archive_server.Models;
+using family_archive_server.RepositoriesDb;
 
 namespace family_archive_server.Utilities
 {
     public static class PersonUtils
     {
+        public static string FindDates(PersonDb personDb)
+        {
+            string dates = null;
+
+            if (personDb.BirthRangeStart != default || personDb.DeathRangeStart != default)
+            {
+                dates += " (";
+                if (personDb.BirthRangeStart != default)
+                {
+                    dates += Format.FindDateFromRange(personDb.BirthRangeStart, personDb.BirthRangeEnd);
+                }
+
+                if (personDb.DeathRangeStart != default)
+                {
+                    dates += " - " + Format.FindDateFromRange(personDb.DeathRangeStart, personDb.DeathRangeEnd);
+                }
+
+                dates += ")";
+            }
+
+            return dates;
+        }
+
+        public static ListPerson CreateListPerson(PersonDb personDb)
+        {
+            return new ListPerson
+            {
+                Id = personDb.Id,
+                Label = personDb.PreferredName + " " + FindDates(personDb)
+            };
+        }
         public static async Task<List<RelationshipTable>> FindSiblings(PersonDb personDb, IPersonRepository personRepository)
         {
             var siblings = new List<RelationshipTable>();

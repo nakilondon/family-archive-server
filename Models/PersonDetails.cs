@@ -10,6 +10,14 @@ namespace family_archive_server.Models
 
     }
 
+    public class ImageDetails
+    {
+        public int Id { get; set; }
+        public string FileName { get; set; }
+        public string Orientation { get; set; }
+        public string Caption { get; set; }
+    }
+
     public class PersonDetails
     {
         public int Id { get; set; }
@@ -25,6 +33,7 @@ namespace family_archive_server.Models
         public string Portrait { get; set; }
         public string Note { get; set; }
         public List<Family> Family { get; set; }
+        public List<ImageDetails> Images { get; set; }
 
     }
 }

@@ -1,10 +1,11 @@
-﻿using System.IO;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using AutoMapper;
-using Dapper;
 using family_archive_server.Models;
+using family_archive_server.RepositoriesDb;
 using Microsoft.Extensions.Configuration;
-using MySql.Data.MySqlClient;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -12,17 +13,22 @@ using Size = System.Drawing.Size;
 
 namespace family_archive_server.Repositories
 {
+    public class ImageSizing
+    {
+        public Size Size { get; set; }
+        public string Orientation { get; set; }
+    }
     public class ImagesRepository : IImagesRepository
     {
         private readonly IMapper _mapper;
-        private readonly string _connectionString;
+        private readonly IImagesDbRepository _imagesDbRepository;
         private readonly IConfiguration _config;
 
-        public ImagesRepository(IMapper mapper, IConfiguration configuration)
+        public ImagesRepository(IMapper mapper, IConfiguration configuration, IImagesDbRepository imagesDbRepository)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection");
             _config = configuration.GetSection("ImageConfig");
             _mapper = mapper;
+            _imagesDbRepository = imagesDbRepository;
         }
 
         private IConfiguration GetSection(ImageType imageType)
@@ -35,38 +41,45 @@ namespace family_archive_server.Repositories
             };
         }
 
-        private  Size GetThumbnailSize(Image<Rgba32> original, IConfiguration config)
+        private ImageSizing GetThumbnailSize(Image<Rgba32> original, IConfiguration config)
         {
             // Width and height.
             int originalWidth = original.Width;
             int originalHeight = original.Height;
+            var imageSizing = new ImageSizing();
 
             // Compute best factor to scale entire image based on larger dimension.
             double factor;
             if (originalWidth > originalHeight)
             {
                 factor = config.GetValue<double>("Width") / originalWidth;
+                imageSizing.Orientation = "L";
             }
             else
             {
                 factor = config.GetValue<double>("Height") / originalHeight;
+                imageSizing.Orientation = "P";
             }
 
-            // Return thumbnail size.
-            return new Size((int)(originalWidth * factor), (int)(originalHeight * factor));
+            
+            imageSizing.Size = new Size((int)(originalWidth * factor), (int)(originalHeight * factor));
+
+            return imageSizing;
         }
 
-        private void ScaleImage(byte[] originalImage, string fileName, IConfiguration configuration)
+        private string ScaleImage(byte[] originalImage, string fileName, IConfiguration configuration)
         {
             var thumbnail = Image.Load(originalImage);
             
-            var size = GetThumbnailSize(thumbnail, configuration);
+            var imageSizing = GetThumbnailSize(thumbnail, configuration);
 
             thumbnail.Mutate(x => x
-                .Resize(size.Width, size.Height));
+                .Resize(imageSizing.Size.Width, imageSizing.Size.Height));
             var thumbnailFileName = Path.Combine(configuration.GetValue<string>("Path"), fileName);
 
             thumbnail.Save(thumbnailFileName);
+
+            return imageSizing.Orientation;
         }
 
         public async Task SaveImage(ImageData imageData)
@@ -82,24 +95,73 @@ namespace family_archive_server.Repositories
 
             //var originalImage = Image.FromStream(new MemoryStream(imageData.Image));
             ScaleImage(imageData.Image, imageData.FileName, GetSection(ImageType.Web));
-            ScaleImage(imageData.Image, imageData.FileName, GetSection(ImageType.Thumbnail));
-
-            var db = new MySqlConnection(_connectionString);
-            await db.ExecuteAsync("INSERT INTO Images(FileName, Type, Location, Description) VALUES (@FileName, @Type, @Location, @Description)", imageDb);
+            imageDb.Orientation = ScaleImage(imageData.Image, imageData.FileName, GetSection(ImageType.Thumbnail));
+            var savedImageDb = await _imagesDbRepository.SaveImageToDb(imageDb);
+            await _imagesDbRepository.SavePeopleInImageDb(imageData.People, savedImageDb.Id);
 
         }
-        
+
+       
         public async Task<ImageData> GetImage(string fileName, ImageType imageType)
         {
-            var db = new MySqlConnection(_connectionString);
-            var imageDb = await db.QueryFirstOrDefaultAsync<ImageData>("SELECT * FROM Images WHERE FileName = @FileName;", new { FileName = fileName });
-            
-            var imageData = _mapper.Map<ImageData>(imageDb);
+            var imageData = await _imagesDbRepository.GetImageData(fileName);
+
+            if (imageData == null)
+            {
+                return null;
+            }
 
             string filename = Path.Combine(GetSection(imageType).GetValue<string>("Path"), imageData.FileName);
             imageData.Image = await File.ReadAllBytesAsync(filename);
 
             return imageData;
         }
+
+        public async Task<List<ImageDb>> GetImagesForPerson(int personId)
+            => await _imagesDbRepository.GetImagesForPerson(personId);
+
+        public Task<List<int>> GetPeopleInImage(int imageId) => _imagesDbRepository.GetPeopleInImage(imageId);
+
+        public Task UpdateImage(ImageDetail imageDetail) => _imagesDbRepository.UpdateImage(imageDetail);
+        
+
+
+        public async Task<ImageDetail> GetImageDetail(int imageId)
+            => await _imagesDbRepository.GetImageDetail(imageId);
+
+        public async Task DeleteImage(int imageId)
+        {
+            var imageDetail = await GetImageDetail(imageId);
+ 
+            DeleteFile(imageDetail.FileName, ImageType.Original);
+            DeleteFile(imageDetail.FileName, ImageType.Web);
+            DeleteFile(imageDetail.FileName, ImageType.Thumbnail);
+
+            await _imagesDbRepository.DeleteImage(imageId);
+        }
+
+        private void DeleteFile(string fileName, ImageType imageType)
+        {
+            var fullFilename = Path.Combine(GetSection(imageType).GetValue<string>("Path"), fileName);
+
+
+            // Delete a file by using File class static method...
+            if (File.Exists(fullFilename))
+            {
+                // Use a try block to catch IOExceptions, to
+                // handle the case of the file already being
+                // opened by another process.
+                try
+                {
+                    File.Delete(fullFilename);
+                }
+                catch (IOException e)
+                {
+                    Console.WriteLine(e.Message);
+                }
+            }
+
+        }
+
     }
 }

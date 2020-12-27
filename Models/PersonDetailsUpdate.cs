@@ -1,12 +1,16 @@
 ﻿using System.Collections.Generic;
-using family_archive_server.Repositories;
+using family_archive_server.RepositoriesDb;
+using Newtonsoft.Json;
 
 namespace family_archive_server.Models
 {
     public class UpdateDate
     {
+        [JsonProperty("day")]
         public int Day { get; set; }
+        [JsonProperty("month")]
         public int Month { get; set; }
+        [JsonProperty("year")]
         public int Year { get; set; }
     }
 
@@ -17,7 +21,7 @@ namespace family_archive_server.Models
         public Relationship Relationship { get; set; }
     }
 
-    public class FamilyUpdate
+    public class PeopleList
     {
         public int Id { get; set; }
         public string Label { get; set; }
@@ -26,6 +30,7 @@ namespace family_archive_server.Models
     public class PersonDetailsUpdate
     {
         public int Id { get; set; }
+        public string Token { get; set; }
         public string Gender { get; set; }
         public string PreferredName { get; set; }
         public string GivenNames { get; set; }

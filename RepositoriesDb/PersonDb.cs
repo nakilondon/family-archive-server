@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace family_archive_server.Repositories
+namespace family_archive_server.RepositoriesDb
 {
     public enum Gender
     {
@@ -50,6 +50,7 @@ namespace family_archive_server.Repositories
         public string Note { get; set; }
         public string Portrait { get; set; }
         public IList<RelationshipTable> Relationships { get; set; }
+        public IList<string> Images { get; set; } 
     }
 
     public class PersonTableDb

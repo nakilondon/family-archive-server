@@ -1,8 +1,9 @@
-﻿using System.Collections.Generic;
-using System.IO;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using family_archive_server.Models;
 using family_archive_server.Repositories;
+using FirebaseAdmin.Auth;
 using Microsoft.AspNetCore.Mvc;
 
 namespace family_archive_server.Controllers
@@ -12,103 +13,165 @@ namespace family_archive_server.Controllers
     public class FamilyTreeController : ControllerBase
     {
         private readonly IFamilyRepository _familyRepository;
-        private readonly IImagesRepository _imagesRepository;
+        
 
-        public FamilyTreeController(IFamilyRepository familyRepository,
-            IImagesRepository imagesRepository)
+        public FamilyTreeController(IFamilyRepository familyRepository)
         {
             _familyRepository = familyRepository;
-            _imagesRepository = imagesRepository;
         }
 
         [HttpGet("{id}")]
-        public async Task<PersonDetails> Get(int id)
+        public async Task<ActionResult<PersonDetails>> Get(int id, [FromHeader] string authorization)
         {
-            var returnValues = await _familyRepository.GetDetails(id);
+            if (string.IsNullOrEmpty(authorization))
+            {
+                return Unauthorized();
+            }
 
-            return returnValues;
+            var auth = FirebaseAuth.DefaultInstance;
+            var firebaseToken = await auth.VerifyIdTokenAsync(authorization);
+
+            var securityLevel = Roles.General;
+            if (firebaseToken.Claims.ContainsKey("edit") && (bool)firebaseToken.Claims["edit"])
+            {
+                securityLevel = Roles.Admin;
+            }
+
+            var returnValues = await _familyRepository.GetDetails(securityLevel, id);
+
+            return Ok(returnValues);
         }
 
         [HttpGet]
-        public async Task<IEnumerable<FamilyTreePerson>> Get()
+        public async Task<ActionResult<IEnumerable<FamilyTreePerson>>> Get([FromHeader] string authorization)
         {
-            var returnValues = await _familyRepository.GetFamilyTree();
-            return returnValues;
+            if (string.IsNullOrEmpty(authorization))
+            {
+                return Unauthorized();
+            }
+
+            var auth = FirebaseAuth.DefaultInstance;
+            var firebaseToken = await auth.VerifyIdTokenAsync(authorization);
+
+            var securityLevel = Roles.General;
+            if (firebaseToken.Claims.ContainsKey("edit") && (bool)firebaseToken.Claims["edit"])
+            {
+                securityLevel = Roles.Admin;
+            }
+            var returnValues = await _familyRepository.GetFamilyTree(securityLevel);
+            foreach (var person in returnValues)
+            {
+                Console.WriteLine($"Description: {person.Description}, id: {person.Id}");
+            }
+            
+            return Ok(returnValues);
         }
 
         [HttpGet("list")]
-        public async Task<IEnumerable<ListPerson>> GetList()
+        public async Task<ActionResult<IEnumerable<ListPerson>>> GetList([FromHeader] string authorization)
         {
-            return await _familyRepository.GetList();
-        }
-
-        [HttpPost("Upload")]
-        public async Task<IActionResult> Post([FromForm] FIleUpload fileUpload)
-        {
-            byte[] fileBytes;
-            using (var memoryStream = new MemoryStream())
+            if (string.IsNullOrEmpty(authorization))
             {
-                await fileUpload.File.CopyToAsync(memoryStream);
-                fileBytes = memoryStream.ToArray();
+                return Unauthorized();
             }
 
-            var imageData = new ImageData
+            var auth = FirebaseAuth.DefaultInstance;
+            var firebaseToken = await auth.VerifyIdTokenAsync(authorization);
+
+            var securityLevel = Roles.General;
+            if (firebaseToken.Claims.ContainsKey("edit") && (bool)firebaseToken.Claims["edit"])
             {
-                FileName = fileUpload.File.FileName,
-                Type = fileUpload.File.ContentType,
-                Description = fileUpload.Description,
-                Location = "",
-                Image = fileBytes
-            };
-
-            await _imagesRepository.SaveImage(imageData);
-
-            return Ok();
-        }
-
-        [HttpGet("img/{fileName}")]
-        public async Task<IActionResult> GetImg(string fileName)
-        {
-            var imageData = await _imagesRepository.GetImage(fileName, ImageType.Web);
-
-            return File(imageData.Image, imageData.Type);
-        }
-
-        [HttpGet("thumbnail/{fileName}")]
-        public async Task<IActionResult> GetThumbnail(string fileName)
-        {
-            var imageData = await _imagesRepository.GetImage(fileName, ImageType.Thumbnail);
-
-            return File(imageData.Image, imageData.Type);
-
+                securityLevel = Roles.Admin;
+            }
+            return Ok(await _familyRepository.GetList(securityLevel));
         }
 
         [HttpPut]
-        public async  Task<PersonDetails> UpdatePerson([FromBody] PersonDetailsUpdate personDetails)
+        public async  Task<ActionResult<PersonDetails>> UpdatePerson([FromBody] PersonDetailsUpdate personDetails, [FromHeader] string authorization)
         {
-            await _familyRepository.UpdatePerson(personDetails);
-            return await _familyRepository.GetDetails(personDetails.Id);
+            if (string.IsNullOrEmpty(authorization))
+            {
+                return Unauthorized();
+            }
+
+            var auth = FirebaseAuth.DefaultInstance;
+            var fireBaseToken = await auth.VerifyIdTokenAsync(authorization);
+
+            if (fireBaseToken.Claims.ContainsKey("edit") && (bool)fireBaseToken.Claims["edit"])
+            {
+                await _familyRepository.UpdatePerson(personDetails);
+                return Ok(await _familyRepository.GetDetails(Roles.Admin, personDetails.Id));
+            }
+
+            return Unauthorized();
         }
 
         [HttpPost]
-        public async Task<PersonDetails> AddPerson([FromBody] PersonDetailsUpdate personDetails)
+        public async Task<ActionResult<PersonDetails>> AddPerson([FromBody] PersonDetailsUpdate personDetails, [FromHeader] string authorization)
         {
-            var personId = await _familyRepository.AddPerson(personDetails);
-            return await _familyRepository.GetDetails(personId);
+            if (string.IsNullOrEmpty(authorization))
+            {
+                return Unauthorized();
+            }
+
+            var auth = FirebaseAuth.DefaultInstance;
+            var fireBaseToken = await auth.VerifyIdTokenAsync(authorization);
+
+            if (fireBaseToken.Claims.ContainsKey("edit") && (bool)fireBaseToken.Claims["edit"])
+            {
+                var personId = await _familyRepository.AddPerson(personDetails);
+                return Ok(await _familyRepository.GetDetails(Roles.Admin, personId));
+            }
+
+            return Unauthorized();
+
         }
 
         [HttpGet("update/{id}")]
-        public async Task<PersonDetailsUpdate> GetUpdate(int id)
+        public async Task<ActionResult<PersonDetailsUpdate>> GetUpdate(int id, [FromHeader] string authorization)
         {
-            var returnValues = await _familyRepository.GetDetailsForUpdate(id);
-            return returnValues;
+            if (string.IsNullOrEmpty(authorization))
+            {
+                return Unauthorized();
+            }
+
+            try
+            {
+                var auth = FirebaseAuth.DefaultInstance;
+                var fireBaseToken = await auth.VerifyIdTokenAsync(authorization);
+
+                if (fireBaseToken.Claims.ContainsKey("edit") && (bool) fireBaseToken.Claims["edit"])
+                {
+                    var returnValues = await _familyRepository.GetDetailsForUpdate(id);
+                    return Ok(returnValues);
+                }
+            }
+            catch
+            {
+                return Unauthorized();
+            }
+
+            return Unauthorized();
         }
 
         [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<ActionResult> Delete(int id, [FromHeader] string authorization)
         {
-            await _familyRepository.DeletePerson(id);
-            return Ok($"Delete {id} successful");
+            if (string.IsNullOrEmpty(authorization))
+            {
+                return Unauthorized();
+            }
+
+            var auth = FirebaseAuth.DefaultInstance;
+            var fireBaseToken = await auth.VerifyIdTokenAsync(authorization);
+
+            if (fireBaseToken.Claims.ContainsKey("edit") && (bool) fireBaseToken.Claims["edit"])
+            {
+                await _familyRepository.DeletePerson(id);
+                return Ok($"Delete {id} successful");
+            }
+
+            return Unauthorized();
         }
     }
 }
