@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 
 namespace family_archive_server.Models
@@ -12,7 +11,7 @@ namespace family_archive_server.Models
     public class FIleUpload
     {
         public string Name { get; set; }
-        public string Location { get; set; }
+        public Location Location { get; set; }
         public UpdateDate Date { get; set; }
         public string Description { get; set; }
         public IList<PeopleList> People { get; set; }

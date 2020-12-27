@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using family_archive_server.DependencyInjection;
+using family_archive_server.RepositoriesDb;
 using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -35,6 +36,7 @@ namespace family_archive_server
             services.AddControllers();
             services.AddSingleton<IFamilyRepository, FamilyRepository>();
             services.AddSingleton<IImagesRepository, ImagesRepository>();
+            services.AddSingleton<IImagesDbRepository, ImagesDbRepository>();
             services.AddSingleton<IPersonRepository, PersonRepository>();
 
             var pathToKey = Path.Combine(Directory.GetCurrentDirectory(), "firebase_admin_sdk.json");

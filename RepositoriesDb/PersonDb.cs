@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace family_archive_server.Repositories
+namespace family_archive_server.RepositoriesDb
 {
     public enum Gender
     {

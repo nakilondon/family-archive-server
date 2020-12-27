@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
 using family_archive_server.Models;
+using family_archive_server.RepositoriesDb;
 using family_archive_server.Utilities;
 
 namespace family_archive_server.Repositories
@@ -21,28 +22,6 @@ namespace family_archive_server.Repositories
             _imagesRepository = imagesRepository;
         }
         
-        public string FindDates(PersonDb personDb)
-        {
-            string dates = null;
-
-            if (personDb.BirthRangeStart != default || personDb.DeathRangeStart != default)
-            {
-                dates += " (";
-                if (personDb.BirthRangeStart != default)
-                {
-                    dates += Format.FindDateFromRange(personDb.BirthRangeStart, personDb.BirthRangeEnd);
-                }
-
-                if (personDb.DeathRangeStart != default)
-                {
-                    dates += " - " + Format.FindDateFromRange(personDb.DeathRangeStart, personDb.DeathRangeEnd);
-                }
-
-                dates += ")";
-            }
-
-            return dates;
-        }
 
         public async Task<IEnumerable<FamilyTreePerson>> GetFamilyTree(Roles roles)
         {
@@ -65,7 +44,7 @@ namespace family_archive_server.Repositories
                     BirthDate = personDb.Value.BirthRangeStart
                 };
 
-                familyTreePerson.Description = FindDates(personDb.Value);
+                familyTreePerson.Description = PersonUtils.FindDates(personDb.Value);
                 
                 var gender = (Gender)Enum.Parse(typeof(Gender),personDb.Value.Gender);
 
@@ -83,7 +62,7 @@ namespace family_archive_server.Repositories
                 
                 if (!string.IsNullOrWhiteSpace(personDb.Value?.Portrait))
                 {
-                    familyTreePerson.Image = $"familytree/thumbnail/{personDb.Value.Portrait}";
+                    familyTreePerson.Image = $"picture/thumbnail/{personDb.Value.Portrait}";
                 }
 
                 var spouses = personDb.Value.Relationships.Where(r =>
@@ -142,15 +121,6 @@ namespace family_archive_server.Repositories
             return familyTreePeople;
         }
 
-        private ListPerson CreateListPerson(PersonDb personDb)
-        {
-            return new ListPerson
-            {
-                Id = personDb.Id,
-                Label = personDb.PreferredName + " " + FindDates(personDb)
-            };
-        }
-
         public async Task<IEnumerable<ListPerson>> GetList(Roles roles)
         {
             var peopleDb = await _personRepository.FindAllPeople();
@@ -160,7 +130,7 @@ namespace family_archive_server.Repositories
             {
                 if (roles != Roles.General || personDb.Value.Dead)
                 {
-                    listPeople.Add(CreateListPerson(personDb.Value));
+                    listPeople.Add(PersonUtils.CreateListPerson(personDb.Value));
                 }
             }
 
@@ -214,17 +184,17 @@ namespace family_archive_server.Repositories
                     caption += $"\t{personDbImage.PreferredName}\n";
                 }
 
-                if (!string.IsNullOrEmpty(image?.Description))
+                if (!string.IsNullOrEmpty(image.Description))
                 {
                     caption += $"Description: {image.Description}\n";
                 }
 
-                if (!string.IsNullOrEmpty(image?.Location))
+                if (!string.IsNullOrEmpty(image.Location))
                 {
                     caption += $"Location: {image.Location}\n";
                 }
 
-                personDetails.Images.Add(new ImageDetails { FileName = image.FileName, Caption = caption });
+                personDetails.Images.Add(new ImageDetails { Id = image.Id, FileName = image.FileName, Orientation = image.Orientation, Caption = caption });
             }
 
             return personDetails;
@@ -241,7 +211,7 @@ namespace family_archive_server.Repositories
                 familyDetails.Add(new FamilyUpdateInternal
                 {
                     Id = relationship.PersonId,
-                    Label = familyPerson.PreferredName + " " + FindDates(familyPerson),
+                    Label = familyPerson.PreferredName + " " + PersonUtils.FindDates(familyPerson),
                     Relationship = relationship.Relationship
                 });
             }

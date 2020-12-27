@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using family_archive_server.Repositories;
+using family_archive_server.RepositoriesDb;
 using Newtonsoft.Json;
 
 namespace family_archive_server.Models

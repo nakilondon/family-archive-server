@@ -12,7 +12,9 @@ namespace family_archive_server.Models
 
     public class ImageDetails
     {
+        public int Id { get; set; }
         public string FileName { get; set; }
+        public string Orientation { get; set; }
         public string Caption { get; set; }
     }
 

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace family_archive_server.Repositories
+namespace family_archive_server.RepositoriesDb
 {
     public interface IPersonRepository
     {

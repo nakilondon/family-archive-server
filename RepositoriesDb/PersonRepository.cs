@@ -3,11 +3,10 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using AutoMapper;
 using Dapper;
-using family_archive_server.Models;
 using Microsoft.Extensions.Configuration;
 using MySql.Data.MySqlClient;
 
-namespace family_archive_server.Repositories
+namespace family_archive_server.RepositoriesDb
 {
 
     public class PersonRepository : IPersonRepository
@@ -47,23 +46,12 @@ WHERE Id = @Id", personDb);
         public async Task<int> AddPerson(PersonDb personDb)
         {
 
-            if (personDb.NickName == null)
-                personDb.NickName = "";
-
-            if (personDb.PlaceOfBirth == null)
-                personDb.PlaceOfBirth = "";
-
-            if (personDb.PlaceOfDeath == null)
-                personDb.PlaceOfDeath = "";
-
-            if (personDb.Note == null)
-                personDb.Note = "";
-
-            if (personDb.Portrait == null)
-                personDb.Portrait = "";
-
-            if (personDb.GedcomId == null)
-                personDb.GedcomId = "";
+            personDb.NickName ??= "";
+            personDb.PlaceOfBirth ??= "";
+            personDb.PlaceOfDeath ??= "";
+            personDb.Note ??= "";
+            personDb.Portrait ??= "";
+            personDb.GedcomId ??= "";
 
             var db = new MySqlConnection(_connectionString);
 
@@ -103,8 +91,12 @@ PlaceOfDeath
 @DeathRangeStart,
 @DeathRangeEnd, 
 @PlaceOfDeath)", personDb);
-            } catch (Exception e)
-            {}
+            }
+            catch (Exception )
+            {
+                // ignored
+            }
+
             return personId;
         }
 
@@ -117,15 +109,14 @@ PlaceOfDeath
             try
             {
  
-               var result = await db.QueryAsync<PersonTableDb, RelationshipDb, PersonDb> (@"
+               await db.QueryAsync<PersonTableDb, RelationshipDb, PersonDb> (@"
 SELECT p.*, r.*
 FROM People p
 INNER JOIN Relationship r ON p.Id = r.Person1
 WHERE p.Id = @Id",
                    (p, r) =>
                    {
-                       PersonDb personDb;
-                       if (!lookup.TryGetValue(p.Id, out personDb))
+                       if (!lookup.TryGetValue(p.Id, out var personDb))
                        {
                            lookup.Add(p.Id, personDb =  _mapper.Map<PersonDb>(p));
                        }
@@ -138,8 +129,11 @@ WHERE p.Id = @Id",
                        return personDb;
                    }, splitOn: "Person1",
                    param: new {@Id = id});
-            } catch (Exception e)
-            {}
+            }
+            catch (Exception)
+            {
+                // ignored
+            }
 
             return lookup[id];
 
@@ -150,11 +144,12 @@ WHERE p.Id = @Id",
             var db = new MySqlConnection(_connectionString);
             try
             {
-                var response = await db.ExecuteAsync("INSERT INTO Relationship (Person1, Relationship, Person2) VALUES ( @Person1, @Relationship, @Person2)", relationshipDb);
+                await db.ExecuteAsync("INSERT INTO Relationship (Person1, Relationship, Person2) VALUES ( @Person1, @Relationship, @Person2)", relationshipDb);
             }
-            catch (Exception e)
-            { }
-
+            catch (Exception)
+            {
+                // ignored
+            }
         }
 
         public async Task<IDictionary<int, PersonDb>> FindAllPeople()
@@ -166,30 +161,27 @@ WHERE p.Id = @Id",
             try
             {
 
-                var result = await db.QueryAsync<PersonTableDb, RelationshipDb, PersonDb>(@"
+                await db.QueryAsync<PersonTableDb, RelationshipDb, PersonDb>(@"
 SELECT p.*, r.*
 FROM People p
 INNER JOIN Relationship r ON p.Id = r.Person1",
                     (p, r) =>
                     {
-                        PersonDb personDb;
-                        if (!lookup.TryGetValue(p.Id, out personDb))
+                        if (!lookup.TryGetValue(p.Id, out var personDb))
                         {
                             lookup.Add(p.Id, personDb = _mapper.Map<PersonDb>(p));
                         }
 
-                        if (personDb.Relationships == null)
-                        {
-                            personDb.Relationships = new List<RelationshipTable>();
-                        }
+                        personDb.Relationships ??= new List<RelationshipTable>();
 
                         personDb.Relationships.Add(new RelationshipTable
                             {PersonId = r.Person2, Relationship = Enum.Parse<Relationship>(r.RelationShip)});
                         return personDb;
                     }, splitOn: "Person1");
             }
-            catch (Exception e)
+            catch (Exception)
             {
+                // ignored
             }
 
             return lookup;
@@ -198,48 +190,25 @@ INNER JOIN Relationship r ON p.Id = r.Person1",
         public async Task<IEnumerable<int>> FindRelationships(int personId, Relationship relationship)
         {
             var db = new MySqlConnection(_connectionString);
-            try
-            {
-
-                var result = await db.QueryAsync<int>(@"
+            var result = await db.QueryAsync<int>(@"
 SELECT Person1
 FROM  Relationship 
 WHERE Person2 = @SearchPerson AND
 Relationship = @Relationship", new {SearchPerson = personId, Relationship = relationship.ToString()});
-                return result;
-            }
-            catch (Exception e)
-            {
-                throw e;
-            }
+            return result;
+            
         }
 
         public async Task RemoveRelationships(int personId)
         {
             var db = new MySqlConnection(_connectionString);
-            try
-            {
-
-                await db.ExecuteAsync("DELETE FROM  Relationship WHERE Person1 = @id OR Person2 = @id", new{id = personId});
-                
-            }
-            catch (Exception e)
-            {
-                throw e;
-            }
+            await db.ExecuteAsync("DELETE FROM  Relationship WHERE Person1 = @id OR Person2 = @id", new{id = personId});
         }
 
         public async Task DeletePerson(int personId)
         {
             var db = new MySqlConnection(_connectionString);
-            try
-            {
-                await db.ExecuteAsync("DELETE FROM People WHERE Id = @id", new { id = personId });
-            }
-            catch (Exception e)
-            {
-                throw e;
-            }
+            await db.ExecuteAsync("DELETE FROM People WHERE Id = @id", new { id = personId });
         }
     }
 }
